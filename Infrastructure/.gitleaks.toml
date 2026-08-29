@@ -1,0 +1,10 @@
+# Gitleaks Configuration
+title = "Gitleaks Security Scanner Config"
+
+[allowlist]
+description = "Allowlist for Terraform state and info files"
+paths = [
+    '''\.terraform/''',
+    '''terraform\.tfstate.*''',
+    '''\.terraform\.lock\.hcl'''
+]
