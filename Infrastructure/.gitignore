@@ -1,6 +1,10 @@
 # Local .terraform directories
 **/.terraform/
 
+# Git backup directories
+.git_bak
+**/.git_bak/
+
 # .tfstate files
 *.tfstate
 *.tfstate.*
@@ -12,3 +16,4 @@ crash.*.log
 # Ignore plan files
 tfplan
 *.tfplan
+
