@@ -39,7 +39,7 @@ if (Get-Command gitleaks -ErrorAction SilentlyContinue) {
 }
 
 # 3. TFSec (Terraform Static Code Analysis)
-Write-Host "`n[2/4] Running TFSec (Terraform Security)..." -ForegroundColor Yellow
+Write-Host "`n[3/4] Running TFSec (Terraform Security)..." -ForegroundColor Yellow
 if (Get-Command tfsec -ErrorAction SilentlyContinue) {
     if (Test-Path "$ResolvedTarget\preprod") {
         Write-Host "--- Scanning preprod ---" -ForegroundColor DarkCyan
@@ -89,9 +89,6 @@ if (Get-Command checkov -ErrorAction SilentlyContinue) {
     Write-Host "Checkov / Python not found in PATH, skipping." -ForegroundColor Gray
 }
 
-
-
 Write-Host "`n==========================================================" -ForegroundColor Green
 Write-Host "   Security scan execution completed!                    " -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
-
