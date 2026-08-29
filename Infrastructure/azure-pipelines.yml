@@ -1,0 +1,100 @@
+name: Terraform CI/CD & Security Scan
+
+trigger:
+  branches:
+    include:
+      - main
+      - master
+      - feature/*
+
+pr:
+  branches:
+    include:
+      - main
+      - master
+
+variables:
+  - group: azure-credentials # Azure DevOps Variable Group storing ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_SUBSCRIPTION_ID, ARM_TENANT_ID
+
+stages:
+  - stage: SecurityScan
+    displayName: 'Security & Secret Scan'
+    jobs:
+      - job: GitleaksScan
+        displayName: 'Gitleaks Secret Detection'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - script: |
+              echo "Downloading and running Gitleaks secret scanner..."
+              wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
+              tar -zxvf gitleaks_8.18.2_linux_x64.tar.gz
+              ./gitleaks detect --verbose || true
+            displayName: 'Run Gitleaks Secret Detection'
+            continueOnError: true
+
+  - stage: TerraformCICD
+    displayName: 'Terraform CI/CD'
+    dependsOn: SecurityScan
+    jobs:
+      - job: TerraformJob
+        displayName: 'Terraform Environment Matrix'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          matrix:
+            preprod:
+              ENVIRONMENT: 'preprod'
+            Prod:
+              ENVIRONMENT: 'Prod'
+
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
+
+        steps:
+          - checkout: self
+
+          - task: TerraformInstaller@1
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: 'latest'
+
+          - script: |
+              terraform fmt -check
+            workingDirectory: '$(Build.SourcesDirectory)/Infra29082026/$(ENVIRONMENT)'
+            displayName: 'Terraform Format Check'
+            continueOnError: true
+
+          - script: |
+              terraform init
+            workingDirectory: '$(Build.SourcesDirectory)/Infra29082026/$(ENVIRONMENT)'
+            displayName: 'Terraform Init'
+
+          - script: |
+              terraform validate
+            workingDirectory: '$(Build.SourcesDirectory)/Infra29082026/$(ENVIRONMENT)'
+            displayName: 'Terraform Validate'
+
+          - script: |
+              terraform plan -out=tfplan
+            workingDirectory: '$(Build.SourcesDirectory)/Infra29082026/$(ENVIRONMENT)'
+            displayName: 'Terraform Plan'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Upload Plan Artifact'
+            condition: or(startsWith(variables['Build.SourceBranch'], 'refs/heads/feature/'), eq(variables['Build.Reason'], 'PullRequest'))
+            inputs:
+              targetPath: '$(Build.SourcesDirectory)/Infra29082026/$(ENVIRONMENT)/tfplan'
+              artifactName: 'tfplan-$(ENVIRONMENT)'
+
+          - script: |
+              terraform apply -auto-approve tfplan
+            workingDirectory: '$(Build.SourcesDirectory)/Infra29082026/$(ENVIRONMENT)'
+            displayName: 'Terraform Apply'
+            condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.SourceBranch'], 'refs/heads/master')), eq(variables['Build.Reason'], 'IndividualCI'))
